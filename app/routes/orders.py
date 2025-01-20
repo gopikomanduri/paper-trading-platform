@@ -1,150 +1,139 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
+from app.models import User, Order
+from app.database import get_db
+from app.models import User, Order, Holding
+
+
 from pydantic import BaseModel
-from typing import List
-from app.data_store import users_db, orders_db, transactions_db, inventory_db  # Shared data store
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
+from app.models import User, Order
+from app.database import get_db
 
 router = APIRouter()
 
-# Models
-class Order(BaseModel):
-    email: str  # Identify user by email
-    symbol: str
-    order_type: str  # "BUY" or "SELL"
-    price: float
-    quantity: int
-
-class OrderResponse(BaseModel):
-    id: int
+# Define the request model
+class PlaceOrderRequest(BaseModel):
     email: str
     symbol: str
-    order_type: str
+    order_type: str  # BUY or SELL
     price: float
     quantity: int
-    status: str
 
-# # Place an order
-# @router.post("/place_order", response_model=OrderResponse, tags=["Orders"])
-# def place_order(order: Order):
-#     # Look up the user by email
-#     user = users_db.get(order.email)
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found")
+@router.post("/place_order", tags=["Orders"])
+def place_order(
+    order_request: PlaceOrderRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Place an order and update the user's holdings.
+    """
+    email = order_request.email
+    symbol = order_request.symbol
+    order_type = order_request.order_type
+    price = order_request.price
+    quantity = order_request.quantity
 
-#     cost = order.price * order.quantity
-
-#     # Handle BUY order
-#     if order.order_type == "BUY":
-#         if user["balance"] < cost:
-#             raise HTTPException(status_code=400, detail="Insufficient balance")
-#         user["balance"] -= cost
-#         inventory_db[order.email] = inventory_db.get(order.email, {})
-#         inventory_db[order.email][order.symbol] = inventory_db[order.email].get(order.symbol, 0) + order.quantity
-
-#     # Handle SELL order
-#     elif order.order_type == "SELL":
-#         inventory = inventory_db.get(order.email, {})
-#         if inventory.get(order.symbol, 0) < order.quantity:
-#             raise HTTPException(status_code=400, detail="Insufficient inventory")
-#         inventory[order.symbol] -= order.quantity
-#         user["balance"] += cost
-
-#     else:
-#         raise HTTPException(status_code=400, detail="Invalid order type")
-
-#     # Save the order
-#     order_id = len(orders_db) + 1
-#     orders_db.append({
-#         "id": order_id,
-#         "email": order.email,
-#         "symbol": order.symbol,
-#         "order_type": order.order_type,
-#         "price": order.price,
-#         "quantity": order.quantity,
-#         "status": "COMPLETED"
-#     })
-
-#     # Log the transaction
-#     transactions_db.append({
-#         "email": order.email,
-#         "type": order.order_type,
-#         "amount": -cost if order.order_type == "BUY" else cost,
-#         "balance": user["balance"]
-#     })
-
-#     return {
-#         "id": order_id,
-#         "email": order.email,
-#         "symbol": order.symbol,
-#         "order_type": order.order_type,
-#         "price": order.price,
-#         "quantity": order.quantity,
-#         "status": "COMPLETED"
-#     }
-
-
-@router.post("/place_order", response_model=OrderResponse, tags=["Orders"])
-def place_order(order: Order):
-    # Debugging: Print the current users_db and the email being searched
-    print("Current users_db:", users_db)
-    print("Order email:", order.email)
-
-    # Normalize email to lowercase for consistent lookups
-    user = users_db.get(order.email.lower())
+    # Fetch the user
+    user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    cost = order.price * order.quantity
+    # Handle BUY orders
+    if order_type.upper() == "BUY":
+        total_cost = price * quantity
+        if user.balance < total_cost:
+            raise HTTPException(status_code=400, detail="Insufficient balance to place the order.")
+        user.balance -= total_cost  # Deduct balance
 
-    # Handle BUY order
-    if order.order_type == "BUY":
-        if user["balance"] < cost:
-            raise HTTPException(status_code=400, detail="Insufficient balance")
-        user["balance"] -= cost
-        inventory_db[order.email] = inventory_db.get(order.email, {})
-        inventory_db[order.email][order.symbol] = inventory_db[order.email].get(order.symbol, 0) + order.quantity
+        # Update or create a holding
+        holding = db.query(Holding).filter(Holding.user_id == user.id, Holding.symbol == symbol).first()
+        if holding:
+            # Update existing holding
+            new_quantity = holding.quantity + quantity
+            new_total_value = holding.total_value + total_cost
+            holding.avg_buy_price = new_total_value / new_quantity
+            holding.quantity = new_quantity
+            holding.total_value = new_total_value
+        else:
+            # Create new holding
+            new_holding = Holding(
+                user_id=user.id,
+                symbol=symbol,
+                quantity=quantity,
+                avg_buy_price=price,
+                total_value=total_cost
+            )
+            db.add(new_holding)
 
-    # Handle SELL order
-    elif order.order_type == "SELL":
-        inventory = inventory_db.get(order.email, {})
-        if inventory.get(order.symbol, 0) < order.quantity:
-            raise HTTPException(status_code=400, detail="Insufficient inventory")
-        inventory[order.symbol] -= order.quantity
-        user["balance"] += cost
+    # Handle SELL orders
+    elif order_type.upper() == "SELL":
+        holding = db.query(Holding).filter(Holding.user_id == user.id, Holding.symbol == symbol).first()
+        if not holding or holding.quantity < quantity:
+            raise HTTPException(status_code=400, detail="Insufficient quantity in portfolio to sell.")
+        holding.quantity -= quantity
+        holding.total_value -= quantity * holding.avg_buy_price
+        if holding.quantity == 0:
+            db.delete(holding)  # Remove holding if quantity reaches zero
+        user.balance += price * quantity  # Add funds to balance
 
-    else:
-        raise HTTPException(status_code=400, detail="Invalid order type")
+    # Commit the transaction
+    db.commit()
+    db.refresh(user)
+    print("Order successfully committed to the database.")
+    return {"message": "Order placed successfully", "balance": user.balance}
 
-    # Save the order
-    order_id = len(orders_db) + 1
-    orders_db.append({
-        "id": order_id,
-        "email": order.email,
-        "symbol": order.symbol,
-        "order_type": order.order_type,
-        "price": order.price,
-        "quantity": order.quantity,
-        "status": "COMPLETED"
-    })
+# Define the request model
+class OrderHistoryRequest(BaseModel):
+    email: str
+    symbol: str = None  # Optional
+    order_type: str = None  # Optional
 
-    # Log the transaction
-    transactions_db.append({
-        "email": order.email,
-        "type": order.order_type,
-        "amount": -cost if order.order_type == "BUY" else cost,
-        "balance": user["balance"]
-    })
+@router.post("/history", tags=["Orders"])
+def get_order_history(
+    request: OrderHistoryRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch order history for a given user.
+    """
+    email = request.email
+    symbol = request.symbol
+    order_type = request.order_type
+
+    # Fetch the user
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    print(f"Fetching orders for user ID: {user.id}")
+
+    # Query the orders for the user
+    query = db.query(Holding).filter(Holding.user_id == user.id)
+
+    # Apply filters
+    if symbol:
+        query = query.filter(Holding.symbol == symbol)
+    if order_type:
+        query = query.filter(Holding.order_type == order_type.upper())  # Normalize case
+
+    # Fetch results
+    orders = query.all()
+    if not orders:
+        return {"message": "No orders found for the given criteria."}
+
+    print(f"Fetched {len(orders)} orders.")
 
     return {
-        "id": order_id,
-        "email": order.email,
-        "symbol": order.symbol,
-        "order_type": order.order_type,
-        "price": order.price,
-        "quantity": order.quantity,
-        "status": "COMPLETED"
+        "orders": [
+            {
+                "id": order.id,
+                "symbol": order.symbol,
+                "quantity": order.quantity,
+                "avg_buy_price": order.avg_buy_price,
+                "total_value": order.total_value
+            }
+            for order in orders
+        ]
     }
-
-# Get all orders
-@router.get("/get_orders", response_model=List[OrderResponse], tags=["Orders"])
-def get_orders():
-    return orders_db
