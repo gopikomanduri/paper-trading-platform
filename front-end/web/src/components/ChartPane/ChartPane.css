@@ -1,47 +1,42 @@
-import React, { useState } from "react";
-import { ResizableBox } from "react-resizable";
-import "react-resizable/css/styles.css";
-import { AdvancedRealTimeChart } from "react-ts-tradingview-widgets";
+/* .chart-container {
+    position: relative;
+    height: 100%;
+    background-color: white;
+  }
+  
+  .timeframe-buttons {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+  
+  .timeframe-buttons button {
+    margin: 0 5px;
+    padding: 5px 10px;
+    background-color: lightgray;
+    border: 1px solid gray;
+    cursor: pointer;
+  }
+  
+  .timeframe-buttons button.active {
+    background-color: gold;
+    font-weight: bold;
+  }
+   */
 
-const ChartPane = () => {
-  // Initial width and height
-  const [width, setWidth] = useState(800); // Default width in pixels
-  const [height, setHeight] = useState(400); // Default height in pixels
+   .react-resizable {
+  position: relative;
+  border: 1px solid #ccc; /* Optional border for better visualization */
+  overflow: hidden; /* Prevent content overflow */
+}
 
-  const handleResize = (event, { size }) => {
-    // Update the width and height dynamically
-    setWidth(size.width);
-    setHeight(size.height);
-  };
-
-  return (
-    <div style={{ margin: "20px" }}>
-      <ResizableBox
-        width={width} // Numeric value for width
-        height={height} // Numeric value for height
-        resizeHandles={["s", "e", "se"]}
-        minConstraints={[300, 300]} // Minimum size (in pixels)
-        maxConstraints={[1200, 800]} // Maximum size (in pixels)
-        onResize={handleResize}
-      >
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            border: "1px solid #ccc",
-            background: "#fff",
-          }}
-        >
-          <AdvancedRealTimeChart
-            symbol="NASDAQ:AAPL" // Update with desired stock symbol
-            interval="5"
-            theme="dark"
-            autosize
-          />
-        </div>
-      </ResizableBox>
-    </div>
-  );
-};
-
-export default ChartPane;
+.react-resizable-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  bottom: 0;
+  right: 50%;
+  background: #ccc;
+  cursor: s-resize; /* Show resize cursor */
+  transform: translateX(50%);
+}
