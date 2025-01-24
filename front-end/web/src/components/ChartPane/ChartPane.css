@@ -1,42 +1,84 @@
-/* .chart-container {
-    position: relative;
-    height: 100%;
-    background-color: white;
+.chart-pane-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100vh;
+    padding: 0;
+    margin: 0;
   }
   
-  .timeframe-buttons {
+  .chart-toolbar {
     display: flex;
     justify-content: center;
+    gap: 10px;
     margin-bottom: 10px;
   }
   
-  .timeframe-buttons button {
-    margin: 0 5px;
-    padding: 5px 10px;
-    background-color: lightgray;
-    border: 1px solid gray;
+  .buy-btn {
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
     cursor: pointer;
   }
   
-  .timeframe-buttons button.active {
-    background-color: gold;
-    font-weight: bold;
+  .sell-btn {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
   }
-   */
-
-   .react-resizable {
-  position: relative;
-  border: 1px solid #ccc; /* Optional border for better visualization */
-  overflow: hidden; /* Prevent content overflow */
-}
-
-.react-resizable-handle {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  bottom: 0;
-  right: 50%;
-  background: #ccc;
-  cursor: s-resize; /* Show resize cursor */
-  transform: translateX(50%);
-}
+  
+  .chart-container {
+    border: 1px solid #ccc;
+    background-color: #1e1e1e;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  
+  .order-dialog {
+    position: absolute;
+    top: 100px;
+    left: 100px;
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 16px;
+    border-radius: 4px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+  }
+  
+  .dialog-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  
+  .dialog-actions {
+    display: flex;
+    justify-content: space-between;
+  }
+  
+  .submit-btn, .close-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .submit-btn {
+    background-color: #4caf50;
+    color: white;
+  }
+  
+  .close-btn {
+    background-color: #f44336;
+    color: white;
+  }
+  

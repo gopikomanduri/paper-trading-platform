@@ -2,10 +2,20 @@ from fastapi import FastAPI
 from app.routes import auth, orders, transactions  # Import all route modules
 from app.database import init_db
 from sqlalchemy.orm import configure_mappers
+from fastapi.middleware.cors import CORSMiddleware
+
 
 
 # Create FastAPI instance
 app = FastAPI(title="Algorithmic Trading Platform", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
 
 @app.on_event("startup")
 def startup_event():
